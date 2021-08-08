@@ -927,7 +927,8 @@ void kfio_disk_stat_write_update(kfio_disk_t *fgd, uint64_t totalsize, uint64_t 
         * part_stat_lock() with CONFIG_PREEMPT_RT can't be used! It ends up calling
         * rcu_read_update which is GPL in the RT patch set.
         */
-        cpu = part_stat_lock();
+        rcu_read_lock();
+        cpu = get_cpu();
 #   if KFIOC_X_PART_STAT_REQUIRES_CPU
         part_stat_inc(cpu, &gd->part0, ios[1]);
         part_stat_add(cpu, &gd->part0, sectors[1], totalsize >> 9);
@@ -946,7 +947,10 @@ void kfio_disk_stat_write_update(kfio_disk_t *fgd, uint64_t totalsize, uint64_t 
         part_stat_add(&gd->part0, ticks[1],   kfio_div64_64(duration * HZ, 1000000));
 #     endif
 #   endif
-        part_stat_unlock();
+        do {
+            put_cpu();
+            rcu_read_unlock();
+        } while (0);
 # endif /* defined(KFIOC_CONFIG_PREEMPT_RT) */
 # else /* KFIOC_PARTITION_STATS */
 
@@ -986,7 +990,8 @@ void kfio_disk_stat_read_update(kfio_disk_t *fgd, uint64_t totalsize, uint64_t d
 
     /* part_stat_lock() with CONFIG_PREEMPT_RT can't be used!
        It ends up calling rcu_read_update which is GPL in the RT patch set */
-        cpu = part_stat_lock();
+        rcu_read_lock();
+        cpu = get_cpu();
 #   if KFIOC_X_PART_STAT_REQUIRES_CPU
         part_stat_inc(cpu, &gd->part0, ios[0]);
         part_stat_add(cpu, &gd->part0, sectors[0], totalsize >> 9);
@@ -1005,7 +1010,10 @@ void kfio_disk_stat_read_update(kfio_disk_t *fgd, uint64_t totalsize, uint64_t d
         part_stat_add(&gd->part0, ticks[0],   kfio_div64_64(duration * HZ, 1000000));
 #     endif
 #   endif
-        part_stat_unlock();
+        do {
+            put_cpu();
+            rcu_read_unlock();
+        } while (0);
 # endif /* KFIO_CONFIG_PREEMPT_RT */
 # else /* KFIO_PARTITION_STATS */
 #  if KFIOC_HAS_DISK_STATS_READ_WRITE_ARRAYS
